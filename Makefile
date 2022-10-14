@@ -176,8 +176,8 @@ installcheck: regresscheck isolationcheck testgrescheck
 	echo "All checks are successful!"
 
 else
-subdir = contrib/orioledb
-top_builddir = ../..
+subdir = src/submodules/orioledb
+top_builddir = ../../..
 override PG_CPPFLAGS += -I$(top_srcdir)/$(subdir)/include
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
