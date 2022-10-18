@@ -72,6 +72,9 @@
 #include "utils/syscache.h"
 #include "utils/snapmgr.h"
 
+#include "catalog/ag_label.h"
+#include "commands/graphcmds.h"
+
 /* commands/trigger.c */
 extern Datum pg_trigger_depth(PG_FUNCTION_ARGS);
 
@@ -1060,6 +1063,60 @@ orioledb_utility_command(PlannedStmt *pstmt,
 
 		if (needCleanup)
 			EventTriggerEndCompleteQuery();
+		call_next = false;
+	}
+	else if (IsA(pstmt->utilityStmt, CreateLabelStmt))
+	{
+		CreateLabelStmt *create_label_stmt = (CreateLabelStmt *) pstmt->utilityStmt;
+		char		labkind;
+		List	   *stmts;
+		ListCell   *l;
+
+		if (create_label_stmt->labelKind == LABEL_VERTEX)
+			labkind = LABEL_KIND_VERTEX;
+		else
+			labkind = LABEL_KIND_EDGE;
+
+		stmts = transformCreateLabelStmt(create_label_stmt, queryString);
+		foreach(l, stmts)
+		{
+			Node	   *stmt = (Node *) lfirst(l);
+
+			if (IsA(stmt, CreateStmt))
+			{
+				CreateStmt	   *create_stmt = (CreateStmt *) stmt;
+				ObjectAddress	reladdr;
+
+				reladdr = o_define_relation(create_stmt, RELKIND_RELATION,
+											queryString);
+
+				DefineLabel(&reladdr, (CreateStmt *) stmt, labkind,
+							create_label_stmt->only_base,
+							create_label_stmt->fixed_id);
+			}
+			else
+			{
+				PlannedStmt *wrapper;
+
+				/*
+				 * Recurse for anything else.  Note the recursive call will stash
+				 * the objects so created into our event trigger context.
+				 */
+
+				wrapper = makeNode(PlannedStmt);
+				wrapper->commandType = CMD_UTILITY;
+				wrapper->canSetTag = false;
+				wrapper->utilityStmt = stmt;
+				wrapper->stmt_location = pstmt->stmt_location;
+				wrapper->stmt_len = pstmt->stmt_len;
+
+				ProcessUtility(wrapper, queryString, false,
+							   PROCESS_UTILITY_SUBCOMMAND, params, NULL,
+							   None_Receiver, NULL);
+			}
+
+			CommandCounterIncrement();
+		}
 		call_next = false;
 	}
 	else if (IsA(pstmt->utilityStmt, CreateTableAsStmt))
