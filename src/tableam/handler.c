@@ -394,7 +394,7 @@ orioledb_tuple_insert_on_conflict(ModifyTableState *mstate,
 }
 
 static TM_Result
-orioledb_tuple_delete(ModifyTableState *mstate,
+orioledb_tuple_delete(EPQState *epqstate,
 					  ResultRelInfo *rinfo,
 					  EState *estate,
 					  Datum tupleid,
@@ -422,7 +422,7 @@ orioledb_tuple_delete(ModifyTableState *mstate,
 	marg.oxid = oxid;
 	marg.csn = snapshot->snapshotcsn;
 	marg.rinfo = rinfo;
-	marg.epqstate = &mstate->mt_epqstate;
+	marg.epqstate = epqstate;
 	marg.scanSlot = returningSlot ? returningSlot : descr->oldTuple;
 	marg.rowLockMode = RowLockUpdate;
 
