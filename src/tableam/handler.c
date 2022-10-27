@@ -483,7 +483,7 @@ orioledb_tableam_tuple_update(Relation relation, ItemPointer otid, TupleTableSlo
 }
 
 static TM_Result
-orioledb_tuple_update(ModifyTableState *mstate, ResultRelInfo *rinfo,
+orioledb_tuple_update(EPQState *epqstate, ResultRelInfo *rinfo,
 					  EState *estate,
 					  Datum tupleid, TupleTableSlot *slot,
 					  CommandId cid, Snapshot snapshot, Snapshot crosscheck,
@@ -509,7 +509,7 @@ orioledb_tuple_update(ModifyTableState *mstate, ResultRelInfo *rinfo,
 	if (GET_PRIMARY(descr)->primaryIsCtid)
 		o_btree_load_shmem(&GET_PRIMARY(descr)->desc);
 
-	o_check_constraints(rinfo, slot, mstate->ps.state);
+	o_check_constraints(rinfo, slot, estate);
 
 	*update_indexes = false;
 	oxid = get_current_oxid();
@@ -521,7 +521,7 @@ orioledb_tuple_update(ModifyTableState *mstate, ResultRelInfo *rinfo,
 	marg.oxid = oxid;
 	marg.csn = snapshot->snapshotcsn;
 	marg.rinfo = rinfo;
-	marg.epqstate = &mstate->mt_epqstate;
+	marg.epqstate = epqstate;
 	marg.scanSlot = descr->oldTuple;
 	marg.newSlot = (OTableSlot *) slot;
 
@@ -537,7 +537,7 @@ orioledb_tuple_update(ModifyTableState *mstate, ResultRelInfo *rinfo,
 	 */
 	keyAttrs = RelationGetIndexAttrBitmap(rinfo->ri_RelationDesc,
 										  INDEX_ATTR_BITMAP_KEY);
-	rte = exec_rt_fetch(rinfo->ri_RangeTableIndex, mstate->ps.state);
+	rte = exec_rt_fetch(rinfo->ri_RangeTableIndex, estate);
 	updatedAttrs = rte->updatedCols;
 	if (!bms_overlap(keyAttrs, updatedAttrs))
 		marg.rowLockMode = RowLockNoKeyUpdate;
